@@ -33,7 +33,7 @@ class WebArenaInstance:
             os.environ[key] = os.environ[append_wa(key)]
 
         # import webarena on instanciation
-        from webarena.browser_env.env_config import (
+        from nudgingarena.browser_env.env_config import (
             ACCOUNTS,
             GITLAB,
             HOMEPAGE,
