@@ -1,6 +1,7 @@
 import logging
 import os
 from typing import Literal
+import traceback
 
 import gymnasium as gym
 import numpy as np
@@ -235,9 +236,8 @@ def massage_tasks(task_ids: list[str], max_retries: int = 1):
                     logger.info(f"Massage failed, retrying ({task_retries} / {max_retries})")
                     continue
                 else:
-                    logger.warning(
-                        f"Error during task massage after {task_retries} retries ({gym_id}): {e}"
-                    )
+                    logger.error(f"Error during task massage after {task_retries} retries ({gym_id}): {str(e)}")
+                    logger.error(f"Full traceback:\n{traceback.format_exc()}")
                     break
             finally:
                 env.close()
