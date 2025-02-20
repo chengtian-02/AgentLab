@@ -48,9 +48,9 @@ class GenericWebArenaTask(AbstractBrowserTask):
             )
 
         # read the list of all webarena task configs
-        import nudgingarena as webarena
+        import nudgingarena
 
-        all_configs_str = importlib.resources.files(webarena).joinpath("test.raw.json").read_text()
+        all_configs_str = importlib.resources.files(nudgingarena).joinpath("test.raw.json").read_text()
 
         # substitute URLs
         for pattern, url_key in {
