@@ -50,27 +50,45 @@ def register_task(
         *kwargs: additional keyword arguments for either the gym or the browsergym environment.
     """
     if task_kwargs and default_task_kwargs:
-        # check overlap between frozen and default task_kwargs
-        clashing_kwargs = set(task_kwargs) & set(default_task_kwargs)  # key set intersection
+        clashing_kwargs = set(task_kwargs) & set(default_task_kwargs)
         if clashing_kwargs:
             raise ValueError(
                 f"Illegal attempt to register Browsergym environment {id} with both frozen and default values for task parameters {clashing_kwargs}."
             )
 
-    task_entrypoint = task_class
+    # Special handling for nudging arena tasks
+    if id.startswith("nudgingarena."):
+        print(f"Registering nudging arena task with config: {task_kwargs}")
+        # For nudging arena tasks, don't use any frozen parameters
+        gym.register(
+            id=f"browsergym/{id}",
+            entry_point=lambda *env_args, **env_kwargs: BrowserEnv(
+                task_entrypoint=task_class,  # Pass the class directly
+                task_kwargs=task_kwargs,
+                *env_args,
+                **env_kwargs
+            ),
+            nondeterministic=nondeterministic,
+            *args,
+            **kwargs,
+        )
+    else:
+        # Standard task registration with frozen task_kwargs
+        task_entrypoint = task_class
+        task_entrypoint = frozen_partial(task_class, **task_kwargs)
+        task_entrypoint = partial(task_entrypoint, **default_task_kwargs)
+        
+        gym.register(
+            id=f"browsergym/{id}",
+            entry_point=lambda *env_args, **env_kwargs: BrowserEnv(
+                task_entrypoint=task_entrypoint,
+                task_kwargs={},  # Empty dict for non-nudging tasks
+                *env_args,
+                **env_kwargs
+            ),
+            nondeterministic=nondeterministic,
+            *args,
+            **kwargs,
+        )
 
-    # freeze task_kwargs (cannot be overriden at environment creation)
-    task_entrypoint = frozen_partial(task_class, **task_kwargs)
-
-    # pre-set default_task_kwargs (can be overriden at environment creation)
-    task_entrypoint = partial(task_entrypoint, **default_task_kwargs)
-
-    gym.register(
-        id=f"browsergym/{id}",
-        entry_point=lambda *env_args, **env_kwargs: BrowserEnv(
-            task_entrypoint, *env_args, **env_kwargs
-        ),
-        nondeterministic=nondeterministic,
-        *args,
-        **kwargs,
-    )
+    print(f"Registered task {id} with kwargs {task_kwargs}")

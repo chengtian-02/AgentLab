@@ -2,7 +2,6 @@ import copy
 import logging
 import re
 import time
-import json
 from abc import ABC
 from pathlib import Path
 from typing import Literal, Optional
@@ -10,7 +9,6 @@ from typing import Literal, Optional
 import gymnasium as gym
 import numpy as np
 import playwright.sync_api
-import importlib
 
 from . import _get_global_playwright
 from .action.base import execute_python_code
@@ -174,35 +172,6 @@ class BrowserEnv(gym.Env, ABC):
         # action space
         self.action_space = Unicode()
 
-        print("Initializing BrowserEnv with task_kwargs:", task_kwargs)
-        
-        # Load config file if specified in task_kwargs
-        self.config = None
-        if task_kwargs.get("config_file"):
-            config_path = Path(task_kwargs["config_file"])
-            print(f"Loading config from {config_path}")
-            if config_path.exists():
-                with open(config_path, "r") as f:
-                    self.config = json.load(f)
-                    print(f"Loaded config with choices: {bool('choices' in self.config)}")
-                    
-                    # Store full config for environment use (like route handler)
-                    self.env_config = {**task_kwargs, **self.config}
-                    
-                    # Only pass config_file to task
-                    self.task_kwargs = {"config_file": task_kwargs["config_file"]}
-                    
-                    print("Task kwargs:", self.task_kwargs)
-            else:
-                logger.warning(f"Config file {config_path} does not exist")
-                self.task_kwargs = dict(**task_kwargs)
-                self.env_config = dict(**task_kwargs)
-        else:
-            self.task_kwargs = dict(**task_kwargs)
-            self.env_config = dict(**task_kwargs)
-
-        self.reset()
-
     def close(self):
         # stop the task
         if self.task:
@@ -231,10 +200,8 @@ class BrowserEnv(gym.Env, ABC):
             self.chat.close()
             self.browser.close()
 
-        # Create task with only config_file
+        # create a new task
         self.task = self.task_entrypoint(seed=seed, **self.task_kwargs)
-        print(f"Task created with kwargs: {self.task_kwargs}")
-        print(f"Task start URL: {self.task.start_url if hasattr(self.task, 'start_url') else 'Not set'}")
 
         def override_property(task, env, property):
             """Extract property value from env if not None, otherwise from task."""
@@ -290,14 +257,6 @@ class BrowserEnv(gym.Env, ABC):
 
         # set default timeout
         self.context.set_default_timeout(timeout)
-
-        print("task_kwargs", self.task_kwargs)
-        # Now setup route handler since we have context
-        if self.env_config and "choices" in self.env_config:
-            print("Setting up route handler before page loads")
-            self.setup_route_handler(self.context, self.env_config)
-            logger.info("Route handler setup complete")
-            print("Route handler setup complete")
 
         # hack: keep track of the active page with a javascript callback
         # there is no concept of active page in playwright
@@ -391,7 +350,6 @@ document.addEventListener("visibilitychange", () => {
         self.last_action = ""
         self.last_action_error = ""
         self.infeasible_message_received = False
-
 
         # if asked, wait for user message
         self._wait_for_user_message()
@@ -626,107 +584,3 @@ document.addEventListener("visibilitychange", () => {
         }
 
         return obs
-
-    def setup_route_handler(self, context, task_kwargs):
-        """Setup route handler for modifying HTML based on choice configurations"""
-        if not context:
-            print("No context found")
-            return
-        
-        # Use env_config instead of task_kwargs for choices
-        choices = self.env_config.get("choices")
-        print(f"Setting up route handler with choices: {choices}")
-        target_url = choices[0]["url"] if choices else None
-        print(f"Target URL for modification: {target_url}")
-        
-        if not choices:
-            logger.debug("No choices found in config")
-            print("No choices found in config")
-            return
-        
-        def modify_html(route, request):
-            # print(f"Processing request for URL: {request.url}")
-            # print(f"Request type: {request.resource_type}")
-            # print(f"Request method: {request.method}")
-            # print(f"Request headers: {request.headers}")
-            
-            # Check if URL matches exactly
-            if request.url == target_url:
-                # print(f"Found exact match for target URL!")
-                pass
-            
-            if request.resource_type == "document":
-                print(f"Document request detected for {request.url}")
-                response = route.fetch()
-                if response.ok:
-                    # print(f"Response OK, status: {response.status}")
-                    html = response.body()
-                    # print(f"HTML length: {len(html)}")
-                    
-                    # Find matching choice architecture for current URL
-                    choice = next(
-                        (c for c in choices if c["url"] == request.url),
-                        None
-                    )
-                    print(f"Found choice for URL {request.url}: {bool(choice)}")
-
-                    if choice:
-                        try:
-                            print(f"Attempting to modify HTML with functions: {choice['functions']}")
-                            # Apply each modification function
-                            for func_config in choice["functions"]:
-                                module_name = func_config.get("module")
-                                func_name = func_config.get("name")
-                                args = func_config.get("args", {})
-                                
-                                print(f"Attempting to import {module_name}")
-                                try:
-                                    # Try importing from nudgingarena first
-                                    try:
-                                        module = importlib.import_module(f"nudgingarena.{module_name}")
-                                    except ImportError:
-                                        # If that fails, try direct import
-                                        module = importlib.import_module(module_name)
-                                    
-                                    print(f"Successfully imported {module_name}")
-                                    func = getattr(module, func_name)
-                                    print(f"Found function {func_name}")
-                                    
-                                    html = func(html, **args)
-                                    print(f"Successfully applied {module_name}.{func_name}")
-                                except ImportError as e:
-                                    logger.error(f"Could not import module {module_name}: {e}")
-                                    print(f"Import error: {e}")
-                                    continue
-                                except AttributeError as e:
-                                    logger.error(f"Could not find function {func_name} in module {module_name}: {e}")
-                                    print(f"Function not found: {e}")
-                                    continue
-                                except Exception as e:
-                                    logger.error(f"Error applying function {module_name}.{func_name}: {e}")
-                                    print(f"Function error: {e}")
-                                    continue
-                            
-                            route.fulfill(
-                                status=response.status,
-                                headers=response.headers,
-                                body=html
-                            )
-                            print(f"Successfully modified and fulfilled HTML for {request.url}")
-                        except Exception as e:
-                            logger.error(f"Error modifying HTML: {e}")
-                            print(f"Error during modification: {e}")
-                            route.continue_()
-                    else:
-                        print(f"No choice found for URL {request.url}, continuing...")
-                        route.continue_()
-                else:
-                    print(f"Response not OK for {request.url}")
-                    route.continue_()
-            else:
-                # print(f"Non-document request for {request.url}: {request.resource_type}")
-                route.continue_()
-
-        # Add the route handler
-        context.route("**/*", modify_html)
-        print("Route handler setup complete with choices for URLs:", [c["url"] for c in choices])

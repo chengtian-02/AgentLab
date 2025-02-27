@@ -13,6 +13,8 @@ except:
 
 ALL_WEBARENA_TASK_IDS = []
 
+print(f"Registering {len(config.TASK_IDS)} WebArena tasks")
+
 # register all WebArena benchmark
 for task_id in config.TASK_IDS:
     gym_id = f"webarena.{task_id}"
@@ -22,3 +24,5 @@ for task_id in config.TASK_IDS:
         task_kwargs={"task_id": task_id},
     )
     ALL_WEBARENA_TASK_IDS.append(gym_id)
+
+print(f"Registered {len(ALL_WEBARENA_TASK_IDS)} WebArena tasks")

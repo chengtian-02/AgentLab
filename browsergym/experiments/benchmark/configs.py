@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 from browsergym.experiments.benchmark.metadata.utils import (
     task_list_from_metadata,
@@ -8,6 +9,7 @@ from browsergym.experiments.benchmark.utils import (
     make_env_args_list_from_fixed_seeds,
     make_env_args_list_from_repeat_tasks,
     make_env_args_list_from_workarena_curriculum,
+    make_env_args_list_from_nudging_configs,
 )
 
 from .base import Benchmark, HighLevelActionSetArgs
@@ -153,6 +155,26 @@ DEFAULT_BENCHMARKS = {
             fixed_seeds=[0],
         ),
         task_metadata=task_metadata("webarena"),
+    ),
+    "nudgingarena_tiny": lambda: Benchmark(
+        name="nudgingarena_tiny",
+        high_level_action_set_args=DEFAULT_HIGHLEVEL_ACTION_SET_ARGS["webarena"],
+        is_multi_tab=True,
+        supports_parallel_seeds=False,
+        backends=["nudgingarena"],
+        env_args_list=make_env_args_list_from_nudging_configs(
+            config_files=[
+                "config_files/test_shop.json",
+            ],
+            max_steps=30,
+        ),
+        task_metadata=pd.DataFrame([
+            {
+                "task_name": "nudgingarena.shopping-v0",
+                "task_category": "shopping",
+                "browsergym_split": "train"
+            }
+        ])
     ),
     "visualwebarena_tiny": lambda: Benchmark(
         name="visualwebarena_tiny",

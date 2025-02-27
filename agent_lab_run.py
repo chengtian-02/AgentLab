@@ -35,11 +35,10 @@ from agentlab.agents.generic_agent import AGENT_4o_MINI, AGENT_3_5
 from agentlab.experiments.study import make_study
 
 study = make_study(
-    benchmark="webarena_tiny",  # or "webarena", "workarena_l1" ...
+    benchmark="nudgingarena_tiny",  # or "webarena", "workarena_l1" ...
     agent_args=[AGENT_4o_MINI],
     # agent_args=[AGENT_3_5],
-    comment="test with webarena",
+    comment="test with nudgingarena",
 )
-print("Done initializing study")
 
 study.run(n_jobs=1,n_relaunch=3)

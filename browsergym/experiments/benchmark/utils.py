@@ -5,6 +5,7 @@ import traceback
 
 import gymnasium as gym
 import numpy as np
+import pandas as pd
 
 from browsergym.experiments.loop import SEED_MAX, EnvArgs
 
@@ -95,6 +96,31 @@ def make_env_args_list_from_fixed_seeds(
                 )
             )
 
+    return env_args_list
+
+
+def make_env_args_list_from_nudging_configs(
+    config_files: list[str],
+    max_steps: int,
+) -> list[EnvArgs]:
+    env_args_list = []
+    
+    for config_file in config_files:
+        env_args_list.append(
+            EnvArgs(
+                task_name="nudgingarena.shopping-v0",  # Match exactly with task_metadata
+                task_seed=0,
+                max_steps=max_steps,
+                headless=True,
+                record_video=False,
+                wait_for_user_message=False,
+                viewport={"width": 1280, "height": 720},
+                slow_mo=100,
+                storage_state=None,
+                task_kwargs=None
+            )
+        )
+    
     return env_args_list
 
 
@@ -206,6 +232,28 @@ def prepare_backend(backend: str):
             demo_ids = weblinx_browsergym.get_unique_demo_ids(tasks=all_tasks)
             weblinx_browsergym.download_and_unzip_demos(demo_ids=demo_ids, cache_dir=cache_dir)
 
+        case "nudgingarena":
+            # register environments
+            import browsergym.nudgingarena
+
+            # full reset the instance (requires environment variables properly set up)
+            from browsergym.nudgingarena.instance import WebArenaInstance
+
+            default_instance = WebArenaInstance()
+            default_instance.full_reset()
+
+            logging.info(
+                f"Initiating WebArena instance warm-up. Some tasks will be pre-loaded (massaged) to trigger some caching mechanisms and make the server more responsive."
+            )
+            massage_tasks(
+                [
+                    f"webarena.{id}"
+                    for id in [
+                        276,  # shopping
+                    ]
+                ]
+            )
+            
         case _:
             raise NotImplementedError(f"Unknown benchmark backend {repr(backend)}")
 
